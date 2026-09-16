@@ -100,6 +100,7 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 12px;
+            margin-right: 32px;
         }
         .remote-status {
             display: flex;
@@ -277,6 +278,7 @@
                 <div id="status" class="status-bar">
                     <div class="status-dot"></div>
                     <span>Disconnected</span>
+                    <span style="margin-left:auto;color:#888;font-size:12px">RTMP :{{RTMP_PORT}}</span>
                 </div>
             </div>
             <div class="panel">
@@ -368,6 +370,8 @@
                             <option value="1920x1080" ${remote.outputWidth === 1920 && remote.outputHeight === 1080 ? 'selected' : ''}>1920x1080</option>
                             <option value="1280x720" ${remote.outputWidth === 1280 && remote.outputHeight === 720 ? 'selected' : ''}>1280x720</option>
                             <option value="854x480" ${remote.outputWidth === 854 && remote.outputHeight === 480 ? 'selected' : ''}>854x480</option>
+                            <option value="2560x1440" ${remote.outputWidth === 2560 && remote.outputHeight === 1440 ? 'selected' : ''}>2560x1440</option>
+                            <option value="3840x2160" ${remote.outputWidth === 3840 && remote.outputHeight === 2160 ? 'selected' : ''}>3840x2160</option>
                         </select>
                     </div>
                     <div class="remote-toggle">

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"path/filepath"
 	"sync"
 	"time"
@@ -43,6 +44,8 @@ type Config struct {
 var proxy *StreamProxy
 var configPath string
 var cfg *Config
+var rtmpPort int
+var httpPort int
 
 func loadConfig(path string) *Config {
 	data, err := os.ReadFile(path)
@@ -188,9 +191,10 @@ func (p *StreamProxy) startRTMPServer() {
 		p.relayStream(c)
 	}
 
-	listener, err := net.Listen("tcp", ":1935")
+	addr := fmt.Sprintf(":%d", rtmpPort)
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("Failed to listen on :1935: %v", err)
+		log.Fatalf("Failed to listen on %s: %v", addr, err)
 	}
 	defer listener.Close()
 
@@ -257,6 +261,8 @@ func (p *StreamProxy) handleRemotes(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.StringVar(&configPath, "config", "", "Path to config file (default: stream_proxy.json in binary dir)")
+	flag.IntVar(&rtmpPort, "rtmp-port", 1935, "RTMP server port")
+	flag.IntVar(&httpPort, "http-port", 9090, "HTTP server port")
 	flag.Parse()
 
 	if configPath == "" {
@@ -277,9 +283,13 @@ func main() {
 	mux.HandleFunc("/ws", proxy.handleWS)
 	mux.HandleFunc("/api/remotes", proxy.handleRemotes)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "web/index.html")
+		data, _ := os.ReadFile("web/index.html")
+		html := string(data)
+		html = strings.Replace(html, "{{RTMP_PORT}}", fmt.Sprint(rtmpPort), 1)
+		w.Write([]byte(html))
 	})
 
-	fmt.Println("Stream proxy starting on :9090")
-	log.Fatal(http.ListenAndServe(":9090", mux))
+	addr := fmt.Sprintf(":%d", httpPort)
+	fmt.Printf("Stream proxy starting on %s (RTMP on :%d)\n", addr, rtmpPort)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
