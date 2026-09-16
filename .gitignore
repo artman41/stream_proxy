@@ -1,0 +1,5 @@
+*.exe
+*.exe~
+*.log
+*.tmp
+stream_proxy.json

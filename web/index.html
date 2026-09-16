@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Proxy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        h1::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #4fc3f7;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .main { display: grid; grid-template-columns: 1fr 400px; gap: 24px; }
+        .video-section { display: flex; flex-direction: column; gap: 16px; }
+        .video-wrapper {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #video { width: 100%; height: 100%; object-fit: contain; }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f44336;
+        }
+        .status-bar.connected .status-dot { background: #4caf50; }
+        .panel {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .panel h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .remote-card {
+            background: #0f0f0f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+        .remote-card:hover { border-color: #4fc3f7; }
+        .remote-card.primary { border-left: 3px solid #4fc3f7; }
+        .remote-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .remote-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #888;
+        }
+        .remote-status .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #f44336;
+        }
+        .remote-status.active .dot { background: #4caf50; }
+        .remote-bitrate {
+            font-size: 12px;
+            color: #4fc3f7;
+            font-weight: 600;
+        }
+        .remote-name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 14px;
+        }
+        .remote-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #4fc3f7;
+            color: #000;
+            font-weight: 600;
+        }
+        .remote-field { margin-bottom: 10px; }
+        .remote-field label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .remote-field input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #1a1a1a;
+            color: #fff;
+            font-size: 13px;
+            transition: border-color 0.2s;
+        }
+        .remote-field input[type="text"]:focus {
+            outline: none;
+            border-color: #4fc3f7;
+        }
+        .remote-field select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #1a1a1a;
+            color: #fff;
+            font-size: 13px;
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+        .remote-field select:focus {
+            outline: none;
+            border-color: #4fc3f7;
+        }
+        .remote-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .toggle {
+            width: 40px;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle.active { background: #4fc3f7; }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+        }
+        .toggle.active::after { transform: translateX(20px); }
+        .toggle-label { font-size: 13px; color: #888; }
+        .btn-remove {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            color: #666;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .btn-remove:hover { background: #f44336; color: #fff; }
+        .btn-add {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #333;
+            border-radius: 8px;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .btn-add:hover { border-color: #4fc3f7; color: #4fc3f7; }
+        .btn-save {
+            width: 100%;
+            padding: 12px;
+            background: #4fc3f7;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: background 0.2s;
+        }
+        .btn-save:hover { background: #29b6f6; }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #4caf50;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        @media (max-width: 900px) {
+            .main { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Stream Proxy</h1>
+        </header>
+        <div class="main">
+            <div class="video-section">
+                <div class="video-wrapper">
+                    <video id="video" autoplay controls></video>
+                </div>
+                <div id="status" class="status-bar">
+                    <div class="status-dot"></div>
+                    <span>Disconnected</span>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>Remotes</h2>
+                <div id="remotes"></div>
+                <button class="btn-add" onclick="addRemote()">+ Add Remote</button>
+                <button class="btn-save" onclick="saveRemotes()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast" class="toast">Saved</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+    <script>
+        let player = null;
+        let ws = null;
+        let remotes = [];
+
+        function connectStream() {
+            if (player) {
+                player.pause();
+                player.unload();
+                player.detachMediaElement();
+                player.destroy();
+                player = null;
+            }
+            if (ws) ws.close();
+
+            ws = new WebSocket('ws://' + location.host + '/ws');
+            ws.onopen = () => {
+                document.getElementById('status').className = 'status-bar connected';
+                document.getElementById('status').querySelector('span').textContent = 'Connected';
+                player = flvjs.createPlayer({ type: 'flv', url: ws });
+                player.attachMediaElement(document.getElementById('video'));
+                player.load();
+                player.play();
+            };
+            ws.onclose = () => {
+                document.getElementById('status').className = 'status-bar';
+                document.getElementById('status').querySelector('span').textContent = 'Disconnected';
+            };
+        }
+
+        async function loadRemotes() {
+            const response = await fetch('/api/remotes');
+            remotes = await response.json();
+            renderRemotes();
+        }
+
+        function renderRemotes() {
+            const container = document.getElementById('remotes');
+            container.innerHTML = '';
+            remotes.forEach((remote, index) => {
+                const isPrimary = index === 0;
+                const card = document.createElement('div');
+                card.className = 'remote-card' + (isPrimary ? ' primary' : '');
+                card.innerHTML = `
+                    <div class="remote-header">
+                        <span class="remote-name">${isPrimary ? 'Primary' : 'Remote ' + (index + 1)}</span>
+                        <div class="remote-status ${remote.status === 'active' ? 'active' : ''}">
+                            <span class="dot"></span>
+                            <span>${remote.status === 'active' ? 'Active' : 'Idle'}</span>
+                        </div>
+                    </div>
+                    ${isPrimary ? '<span class="remote-badge">Required</span>' : ''}
+                    ${!isPrimary ? '<button class="btn-remove" onclick="removeRemote(' + index + ')">×</button>' : ''}
+                    ${remote.bitrate > 0 ? `<div class="remote-bitrate">${remote.bitrate} kbps</div>` : ''}
+                    <div class="remote-field">
+                        <label>Provider</label>
+                        <select data-index="${index}" data-field="provider" class="provider-select" onchange="onProviderChange(${index})">
+                            <option value="twitch" ${remote.provider === 'twitch' ? 'selected' : ''}>Twitch</option>
+                            <option value="kick" ${remote.provider === 'kick' ? 'selected' : ''}>Kick</option>
+                            <option value="youtube" ${remote.provider === 'youtube' ? 'selected' : ''}>YouTube</option>
+                            <option value="custom" ${remote.provider === 'custom' ? 'selected' : ''}>Custom</option>
+                        </select>
+                    </div>
+                    <div class="remote-field key-field" ${remote.provider === 'custom' ? 'style="display:none"' : ''}>
+                        <label>Stream Key</label>
+                        <input type="text" data-index="${index}" data-field="key" value="${remote.streamKey || ''}" placeholder="stream-key">
+                    </div>
+                    <div class="remote-field custom-url-field" ${remote.provider !== 'custom' ? 'style="display:none"' : ''}>
+                        <label>URL</label>
+                        <input type="text" data-index="${index}" data-field="url" value="${remote.url || ''}" placeholder="rtmp://server/app">
+                    </div>
+                    <div class="remote-field">
+                        <label>Output Size</label>
+                        <select data-index="${index}" data-field="size" class="size-select">
+                            <option value="0x0" ${(!remote.outputWidth || !remote.outputHeight) ? 'selected' : ''}>Auto (Input)</option>
+                            <option value="1920x1080" ${remote.outputWidth === 1920 && remote.outputHeight === 1080 ? 'selected' : ''}>1920x1080</option>
+                            <option value="1280x720" ${remote.outputWidth === 1280 && remote.outputHeight === 720 ? 'selected' : ''}>1280x720</option>
+                            <option value="854x480" ${remote.outputWidth === 854 && remote.outputHeight === 480 ? 'selected' : ''}>854x480</option>
+                        </select>
+                    </div>
+                    <div class="remote-toggle">
+                        <div class="toggle ${remote.enabled ? 'active' : ''}" data-index="${index}" onclick="toggleRemote(${index})"></div>
+                        <span class="toggle-label">Enabled</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function addRemote() {
+            remotes.push({ name: '', url: '', streamKey: '', enabled: false });
+            renderRemotes();
+        }
+
+        function removeRemote(index) {
+            remotes.splice(index, 1);
+            renderRemotes();
+        }
+
+        function toggleRemote(index) {
+            remotes[index].enabled = !remotes[index].enabled;
+            renderRemotes();
+        }
+
+        function onProviderChange(index) {
+            const select = document.querySelector(`select[data-index="${index}"][data-field="provider"]`);
+            remotes[index].provider = select.value;
+            renderRemotes();
+        }
+
+        async function saveRemotes() {
+            document.querySelectorAll('.remote-field input').forEach(input => {
+                const index = parseInt(input.dataset.index);
+                const field = input.dataset.field;
+                if (field === 'url') remotes[index].url = input.value;
+                else if (field === 'key') remotes[index].streamKey = input.value;
+            });
+            document.querySelectorAll('.provider-select').forEach(select => {
+                const index = parseInt(select.dataset.index);
+                remotes[index].provider = select.value;
+            });
+            document.querySelectorAll('.size-select').forEach(select => {
+                const index = parseInt(select.dataset.index);
+                const size = select.value;
+                if (size === '0x0') {
+                    remotes[index].outputWidth = 0;
+                    remotes[index].outputHeight = 0;
+                } else {
+                    const parts = size.split('x');
+                    remotes[index].outputWidth = parseInt(parts[0]);
+                    remotes[index].outputHeight = parseInt(parts[1]);
+                }
+            });
+
+            await fetch('/api/remotes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(remotes)
+            });
+
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        loadRemotes();
+        connectStream();
+    </script>
+</body>
+</html>
